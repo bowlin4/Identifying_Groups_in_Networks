@@ -1,0 +1,130 @@
+---
+title: "Identifying Groups in Networks"
+author: "Hannah Bowlin"
+format: pdf
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T)
+knitr::opts_knit$set(root.dir = './')
+library(tidyverse)
+library(igraph)
+library(tidygraph)
+library(ggraph)
+library(viridis)
+library(dplyr)
+library(ggplot2)
+ggraph::set_graph_style(plot_margin = margin(1,1,1,1), family = 'sans')
+```
+
+## Data
+
+For the following analyses, the `UKfaculty` friendship data which is part of the `igraphdata` package is utilized.
+
+```{r}
+library(igraphdata)
+data("UKfaculty")
+
+UK <- as_tbl_graph(UKfaculty)
+
+UK |>
+  activate(edges) |>
+  ggraph() +
+  geom_edge_fan(alpha=.3) +
+  geom_node_point()
+
+```
+
+```{r}
+UK <- UK |>
+  as.undirected() |> 
+  as_tbl_graph()
+```
+
+# Examples of identifying groups in networks
+
+The following networks depict groups within the network based on community detection algorithms.
+
+```{r}
+UK |> as_tbl_graph() |>
+  activate(nodes) |>
+  mutate(community = as.factor(group_louvain())) |>
+ggraph(layout = 'nicely') +
+  geom_edge_fan(alpha=.1) +
+  geom_node_point(aes(color=community)) +
+  scale_color_viridis_d(name='Louvain Communities')
+```
+
+The following visualization depicts groups by displaying a cloud around the nodes in each group.
+
+```{r}
+library(ggalt)
+
+UK %>%
+  as_tbl_graph() %>%
+  activate(nodes) %>%
+  mutate(community = as.factor(group_louvain())) %>%
+  
+  # Plot the graph
+  ggraph(layout = 'nicely') +
+  geom_edge_fan(alpha = 0.1) +
+  geom_node_point(aes(color = community), size = 3, alpha = 0.5, show.legend = FALSE) +
+  geom_encircle(aes(x = x, y = y, group = community, fill = community), 
+                alpha = 0.2, expand = 0.1, data = . %>%
+                group_by(community) %>%
+                summarise(x = mean(x), y = mean(y))) +
+  scale_color_viridis_d(name = 'Louvain Communities') +
+  theme_void()
+```
+
+```{r}
+lou <- cluster_louvain(UK)
+
+# Step 2: Set layout for the graph
+LO <- layout_with_fr(UK)
+
+# Step 3: Plot the graph with Louvain communities
+plot(lou, UK, vertex.label = NA, vertex.size = 5, edge.arrow.size = 0.2, layout = LO)
+```
+
+Additional example of community detection.
+
+```{r}
+nodes = read_csv('https://github.com/jdfoote/Communication-and-Social-Networks/raw/master/resources/harry_potter_files/hp_node_atts.csv')
+edges = read_csv('https://github.com/jdfoote/Communication-and-Social-Networks/raw/master/resources/harry_potter_files/hp_edgelist.csv')
+
+G <- graph_from_data_frame(d = edges, v = nodes) %>% as_tbl_graph()
+
+# Filter out isolated nodes
+isolated_nodes <- which(degree(G) == 0)
+G_filtered <- delete_vertices(G, isolated_nodes)
+
+# Get unique school years
+unique_school_years <- unique(V(G_filtered)$schoolyear)
+```
+
+```{r}
+G_filtered <- G_filtered |>
+  as.undirected() |> 
+  as_tbl_graph()
+```
+
+```{r}
+G_filtered |> as_tbl_graph() |>
+  activate(nodes) |>
+  mutate(community = as.factor(group_fast_greedy())) |>
+ggraph(layout = 'nicely') + 
+  geom_edge_fan(alpha=.1) + 
+  geom_node_point(aes(color = community)) +
+  scale_color_viridis_d(name = 'Fast Greedy Communities')
+```
+
+```{r}
+G_filtered |> as_tbl_graph() |>
+  activate(nodes) |>
+  mutate(community = as.factor(group_louvain())) |>
+ggraph(layout = 'nicely') + 
+  geom_edge_fan(alpha=.1) + 
+  geom_node_point(aes(color = community)) +
+  scale_color_viridis_d(name = 'Louvain Communities')
+```
